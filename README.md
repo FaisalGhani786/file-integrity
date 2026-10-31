@@ -64,7 +64,7 @@ Shared by both tools, so a baseline from one can be checked by the other:
   "created": "2026-10-31T00:00:00+00:00",
   "root": "site",
   "files": {
-    "config.php": { "sha256": "81f30079…", "size": 98 }
+    "config.php": { "sha256": "81f30079…", "size": 111 }
   }
 }
 ```
