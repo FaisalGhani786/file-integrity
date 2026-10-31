@@ -1,0 +1,9 @@
+{
+  "name": "file-integrity",
+  "version": "1.0.0",
+  "description": "SHA-256 file integrity monitor: browser demo plus a Python CLI with baseline, check and live watch modes.",
+  "type": "module",
+  "scripts": { "test": "node --test test/*.test.js && python3 -m unittest discover -s python" },
+  "author": "Faisal Ghani",
+  "license": "MIT"
+}

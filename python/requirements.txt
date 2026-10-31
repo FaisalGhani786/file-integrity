@@ -1,0 +1,2 @@
+# Only needed for `fim.py watch`. baseline and check use the standard library.
+watchdog>=4.0

@@ -1,0 +1,33 @@
+{
+  "tool": "file-integrity",
+  "version": 1,
+  "algorithm": "sha256",
+  "created": "2026-10-31T00:00:00+00:00",
+  "root": "sample-site",
+  "files": {
+    ".htaccess": {
+      "sha256": "1f064f3937468cd0807f0afe0a0ff61babb86bac9d55f7fdd268a57ca7beba95",
+      "size": 68
+    },
+    "config.php": {
+      "sha256": "81f30079f74d252d6decb32f6a38084d963e774b8d6968ef6a16085900a53e44",
+      "size": 111
+    },
+    "contact.php": {
+      "sha256": "51e6d8445cef865df63dd16d5aeb48b6c7f6c2289b3f8782cace6aae8bbdddc9",
+      "size": 127
+    },
+    "css/site.css": {
+      "sha256": "bc05f190396f9c603a79d719080930b5775e7e1cd13c086ac506b12ba53621d5",
+      "size": 70
+    },
+    "index.html": {
+      "sha256": "57b0d40a449833c727af8b0dd755542623a09f097e77e154a0491b9aa170e497",
+      "size": 205
+    },
+    "robots.txt": {
+      "sha256": "fa2dea94624f41b73b6bd0aba529717795dfb007842c0fba6a590a86e128d4dd",
+      "size": 32
+    }
+  }
+}

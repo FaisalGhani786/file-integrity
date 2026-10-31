@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>File Integrity Monitor · Detect tampered files</title>
+<meta name="description" content="Detect tampered, added and deleted files with SHA-256 fingerprints. Try a simulated website attack in your browser, or check your own files. Nothing is uploaded.">
+<meta property="og:title" content="File Integrity Monitor">
+<meta property="og:description" content="Take a SHA-256 baseline, simulate an attack, and see every tampered file flagged.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M14 6h26l12 12v40H14z' fill='%23FFD200'/%3E%3Cpath d='M40 6v12h12' fill='%23C9A600'/%3E%3Cpath d='M22 38l7 7 13-15' fill='none' stroke='%230B0E13' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: tool header, demo workbench (files+editor | alerts), own-files checker, CLI, explainer */
+:root{
+  --bg:#0B0E13; --surface:#131820; --raise:#1A212B; --field:#0E1218; --ink:#E9EDF2; --ink2:#C5CDD7; --muted:#8E9AA8; --line:#26303C;
+  --accent:#FFD200; --accent-ink:#111; --good:#4CC384; --good-soft:#12301F; --bad:#FF7A6B; --bad-soft:#3A1915; --warn:#F5A524; --warn-soft:#3A2A0C; --crit:#FF4D6D; --crit-soft:#3D0F1A; --info:#8FA8FF; --info-soft:#151D38; --link:#8FA8FF;
+  --display:"Archivo",system-ui,sans-serif; --body:"Figtree",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--body);background-image:radial-gradient(var(--raise) 1.1px,transparent 1.1px);background-size:22px 22px}
+.wrap{max-width:1180px;margin:0 auto;padding:40px max(16px,env(safe-area-inset-right,0px)) 64px max(16px,env(safe-area-inset-left,0px))}
+a{color:var(--link)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.back{display:inline-block;margin-bottom:28px;font:600 14px var(--body);color:var(--muted);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:6px 14px;background:var(--surface)}
+.back:hover{color:var(--ink);border-color:var(--muted)}
+.eyebrow{display:block;font:700 12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+h1{font:900 clamp(38px,7vw,62px)/1 var(--display);font-stretch:115%;letter-spacing:-.02em;margin:14px 0 14px;text-wrap:balance}
+h1 span{color:var(--accent)}
+h2{font:800 20px var(--display);font-stretch:108%;margin:0}
+.lede{color:#B7C1CD;font-size:18px;max-width:44em;margin:0}
+code{font:500 12.5px var(--mono);background:var(--raise);padding:1px 6px;border-radius:4px;color:var(--ink)}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;display:grid;gap:14px;min-width:0}
+.panel-h{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.bench{margin-top:32px;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:20px;align-items:start}
+@media(max-width:940px){.bench{grid-template-columns:1fr}}
+
+.controls{display:flex;flex-wrap:wrap;gap:8px}
+.btn{border:1.5px solid var(--line);background:var(--field);color:var(--ink);border-radius:10px;padding:9px 14px;font:700 14px var(--body);cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{border-color:color-mix(in srgb,var(--bad) 55%,transparent);color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.nudge{animation:nudge 1.4s ease-in-out infinite}
+@keyframes nudge{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent)}50%{box-shadow:0 0 0 6px transparent}}
+.status{font:600 13px var(--mono);color:var(--muted);margin:0}
+.status b{color:var(--ink)}
+
+.files{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);gap:14px}
+@media(max-width:640px){.files{grid-template-columns:1fr}}
+.tree{list-style:none;margin:0;padding:0;display:grid;gap:4px;align-content:start}
+.tree button{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;text-align:left;background:var(--field);border:1.5px solid transparent;border-radius:9px;padding:8px 10px;color:var(--ink);cursor:pointer}
+.tree button:hover{border-color:var(--line)}
+.tree button[aria-current="true"]{border-color:var(--accent)}
+.tree .p{font:600 13px var(--mono);overflow-wrap:anywhere}
+.tree .h{grid-column:1/-1;font:500 11px var(--mono);color:var(--muted);letter-spacing:.02em}
+.tree li.flash button{animation:flash 1.2s ease-out}
+@keyframes flash{from{background:var(--warn-soft)}}
+.chip{font:700 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;align-self:center;white-space:nowrap}
+.c-ok{background:var(--good-soft);color:var(--good)} .c-mod{background:var(--warn-soft);color:var(--warn)} .c-add{background:var(--crit-soft);color:var(--crit)} .c-del{background:var(--bad-soft);color:var(--bad)} .c-new{background:var(--raise);color:var(--muted)}
+.c-crit{background:var(--crit-soft);color:var(--crit)} .c-high{background:var(--bad-soft);color:var(--bad)} .c-medium{background:var(--warn-soft);color:var(--warn)} .c-low{background:var(--info-soft);color:var(--info)}
+.tree .removed .p{text-decoration:line-through;color:var(--muted)}
+
+.editor{display:grid;gap:8px;align-content:start;min-width:0}
+.editor label{font:700 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+textarea{width:100%;min-height:210px;resize:vertical;background:var(--field);color:var(--ink);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;font:500 12.5px/1.65 var(--mono);white-space:pre;overflow:auto}
+textarea:focus{outline:none;border-color:var(--accent)}
+textarea:disabled{opacity:.6}
+.hashbox{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:4px;font:500 11.5px/1.5 var(--mono);overflow-wrap:anywhere}
+.hashbox .k{color:var(--muted);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:10.5px}
+.hashbox .d{background:var(--warn-soft);color:var(--warn);border-radius:2px}
+.hashbox .note{font-family:var(--body);font-size:13px;color:var(--ink2)}
+
+.counts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.count{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:10px}
+.count b{display:block;font:850 26px/1 var(--display);font-stretch:90%;font-variant-numeric:tabular-nums}
+.count span{font:700 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.count.mod b{color:var(--warn)} .count.add b{color:var(--crit)} .count.del b{color:var(--bad)} .count.ok b{color:var(--good)}
+.verdict{border-radius:12px;padding:12px 14px;border:1px solid var(--line);background:var(--field)}
+.verdict strong{display:block;font:850 18px var(--display);font-stretch:105%}
+.verdict.clean{background:var(--good-soft);border-color:color-mix(in srgb,var(--good) 45%,transparent)} .verdict.clean strong{color:var(--good)}
+.verdict.alert{background:var(--crit-soft);border-color:color-mix(in srgb,var(--crit) 45%,transparent)} .verdict.alert strong{color:var(--crit)}
+.verdict span{font-size:14px;color:var(--ink2)}
+.alerts{list-style:none;margin:0;padding:0;display:grid;gap:6px;max-height:380px;overflow:auto}
+.alerts li{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px 11px;display:grid;gap:3px}
+.alerts li.in{animation:slidein .45s cubic-bezier(.2,.8,.2,1)}
+@keyframes slidein{from{transform:translateY(-8px);opacity:.3}}
+.alerts .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.alerts time{font:600 11.5px var(--mono);color:var(--muted)}
+.alerts .path{font:700 13px var(--mono)}
+.alerts p{margin:0;font-size:13.5px;color:var(--ink2)}
+.alerts .empty{color:var(--muted);text-align:center;border-style:dashed;background:transparent}
+
+.own{margin-top:20px}
+.steps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media(max-width:760px){.steps{grid-template-columns:1fr}}
+.step{background:var(--field);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px;align-content:start}
+.step h3{margin:0;font:800 16px var(--display);font-stretch:105%}
+.step p{margin:0;font-size:14px;color:var(--ink2)}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:16px;text-align:center;color:var(--muted);font-size:14px;transition:border-color .2s,background .2s}
+.drop.over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.pick{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:8px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.out{font-size:14px;color:var(--ink2);margin:0}
+.out.err{color:var(--bad)}
+.tablewrap{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{position:sticky;top:0;background:var(--raise);text-align:left;font:700 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:8px 10px}
+td{padding:7px 10px;border-top:1px solid var(--line)}
+td.m{font:500 12.5px var(--mono);overflow-wrap:anywhere}
+
+.cli pre{margin:0;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto;font:500 13px/1.7 var(--mono);color:var(--ink2)}
+.cli pre .c{color:var(--muted)}
+.how{margin-top:20px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media(max-width:860px){.how{grid-template-columns:1fr}}
+.how p{margin:0;color:var(--ink2);font-size:15px}
+footer{margin-top:48px;padding-top:18px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:14px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <a class="back" href="https://faisalghani786.github.io/#projects">← Faisal Ghani · All projects</a>
+  <span class="eyebrow">Defence &amp; monitoring · SHA-256</span>
+  <h1>File Integrity <span>Monitor</span></h1>
+  <p class="lede">Attackers who break into a website usually change files: a backdoor hidden in a config file, a web shell in the uploads folder, security settings switched off. This tool fingerprints every file with SHA-256 and flags anything that changes, appears or disappears. Try the simulated attack below, or check your own files. Nothing leaves your device.</p>
+
+  <div class="bench">
+    <section class="panel" aria-labelledby="demoH">
+      <div class="panel-h">
+        <h2 id="demoH">1 · A small website</h2>
+        <div class="controls">
+          <button class="btn" id="bBase" type="button">Take baseline</button>
+          <button class="btn danger" id="bAttack" type="button">Simulate attack</button>
+          <button class="btn primary" id="bScan" type="button">Scan now</button>
+          <button class="btn" id="bReset" type="button">Reset</button>
+        </div>
+      </div>
+      <p class="status" id="status" aria-live="polite"></p>
+      <div class="files">
+        <ul class="tree" id="tree" aria-label="Website files"></ul>
+        <div class="editor">
+          <label for="ed" id="edLabel">File contents</label>
+          <textarea id="ed" spellcheck="false" autocapitalize="off"></textarea>
+          <div class="hashbox" id="hashbox" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="alertH">
+      <div class="panel-h"><h2 id="alertH">2 · Integrity alerts</h2></div>
+      <div class="counts">
+        <div class="count mod"><b id="nMod">0</b><span>Modified</span></div>
+        <div class="count add"><b id="nAdd">0</b><span>Added</span></div>
+        <div class="count del"><b id="nDel">0</b><span>Removed</span></div>
+        <div class="count ok"><b id="nOk">0</b><span>Unchanged</span></div>
+      </div>
+      <div class="verdict" id="verdict" aria-live="polite"><strong>No scan yet</strong><span>Simulate an attack or edit a file, then press Scan now.</span></div>
+      <ul class="alerts" id="alerts"><li class="empty">Alerts will appear here, newest first, with a timestamp and severity.</li></ul>
+    </section>
+  </div>
+
+  <section class="panel own" aria-labelledby="ownH">
+    <h2 id="ownH">3 · Check your own files</h2>
+    <p class="out">Files are read and hashed in your browser with the Web Crypto API. Nothing is uploaded anywhere.</p>
+    <div class="steps">
+      <div class="step">
+        <h3>A · Create a baseline</h3>
+        <p>Choose a folder (or some files) while you know they're clean. Save the baseline file somewhere safe.</p>
+        <div class="drop" id="dropA">Drop files here
+          <div class="pick">
+            <label class="btn" for="folderA">Choose folder</label><input class="sr" id="folderA" type="file" webkitdirectory multiple>
+            <label class="btn" for="filesA">Choose files</label><input class="sr" id="filesA" type="file" multiple>
+          </div>
+        </div>
+        <p class="out" id="outA"></p>
+        <button class="btn primary" id="saveA" type="button" hidden>Download baseline.json</button>
+      </div>
+      <div class="step">
+        <h3>B · Check against it later</h3>
+        <p>Load your baseline (from this page or the Python tool), then choose the same folder again.</p>
+        <div class="pick" style="justify-content:flex-start;margin:0">
+          <label class="btn" for="loadB">Load baseline.json</label><input class="sr" id="loadB" type="file" accept=".json,application/json">
+        </div>
+        <div class="drop" id="dropB">Drop files here
+          <div class="pick">
+            <label class="btn" for="folderB">Choose folder</label><input class="sr" id="folderB" type="file" webkitdirectory multiple>
+            <label class="btn" for="filesB">Choose files</label><input class="sr" id="filesB" type="file" multiple>
+          </div>
+        </div>
+        <p class="out" id="outB"></p>
+      </div>
+    </div>
+    <div class="tablewrap" id="resultWrap" hidden><table><thead><tr><th>File</th><th>Change</th><th>Severity</th></tr></thead><tbody id="resultB"></tbody></table></div>
+  </section>
+
+  <section class="panel own cli" aria-labelledby="cliH">
+    <h2 id="cliH">4 · Python command-line version</h2>
+    <p class="out">For servers: the same checks from the terminal, plus a live <code>watch</code> mode. Baselines are interchangeable with this page.</p>
+<pre><span class="c"># create a baseline while the site is known to be clean</span>
+python python/fim.py baseline /var/www/site -o baseline.json
+
+<span class="c"># later (or from cron): exit code 1 if anything changed</span>
+python python/fim.py check /var/www/site -m baseline.json
+
+<span class="c"># report changes the moment they happen (pip install watchdog)</span>
+python python/fim.py watch /var/www/site -m baseline.json</pre>
+  </section>
+
+  <section class="how" aria-label="How it works">
+    <div class="panel"><h2>Fingerprints, not copies</h2><p>A SHA-256 hash is a 64-character fingerprint of a file's exact bytes. Change one character and about half the hash changes, so tampering can't hide. The baseline stores only hashes and sizes, never your file contents.</p></div>
+    <div class="panel"><h2>Why not just timestamps?</h2><p>"Last modified" dates are easy to fake: attackers routinely reset them with commands like <code>touch</code> so a backdoor blends in. A hash depends only on the content, so it can't be faked without changing the file back.</p></div>
+    <div class="panel"><h2>Where it's used</h2><p>File integrity monitoring is a standard control in tools like Tripwire, AIDE and Wazuh, and the PCI DSS card-payment standard requires change detection on critical files. Severity rules here flag the classic signs: scripts in upload folders and edited config files.</p></div>
+  </section>
+
+  <footer><span>Built by <a href="https://faisalghani786.github.io">Faisal Ghani</a> for <a href="https://www.cyberprosolutions.co.uk/">CyberPro Solutions</a></span><span><a href="https://github.com/FaisalGhani786/file-integrity">Source code</a></span></footer>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
